@@ -86,7 +86,7 @@ impl Variable {
 }
 
 impl Variable {
-    pub(super) fn index(&self) -> usize {
+    pub fn index(&self) -> usize {
         self.index
     }
 }

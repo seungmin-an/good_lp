@@ -1,4 +1,3 @@
-#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 //!  A Linear Programming modeler that is easy to use, performant with large problems, and well-typed.

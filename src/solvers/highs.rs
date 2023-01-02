@@ -48,6 +48,8 @@ pub fn highs(to_solve: UnsolvedProblem) -> HighsProblem {
         highs_problem,
         columns,
         verbose: false,
+        time_limit: None,
+        thread_nums: None,
     }
 }
 
@@ -58,6 +60,8 @@ pub struct HighsProblem {
     highs_problem: highs::RowProblem,
     columns: Vec<highs::Col>,
     verbose: bool,
+    time_limit: Option<f64>,
+    thread_nums: Option<i32>,
 }
 
 impl HighsProblem {
@@ -70,6 +74,17 @@ impl HighsProblem {
     pub fn set_verbose(&mut self, verbose: bool) {
         self.verbose = verbose
     }
+
+    /// Sets time limit
+    pub fn set_time_limit(&mut self, time_limit: f64) {
+        self.time_limit = Some(time_limit);
+    }
+
+    /// Sets the # of threads for solver
+    pub fn set_threads_nums(&mut self, thread_nums: i32) {
+        assert!(thread_nums >= 1);
+        self.thread_nums = Some(thread_nums);
+    }
 }
 
 impl SolverModel for HighsProblem {
@@ -77,13 +92,24 @@ impl SolverModel for HighsProblem {
     type Error = ResolutionError;
 
     fn solve(self) -> Result<Self::Solution, Self::Error> {
-        let verbose = self.verbose;
+        let (verbose, time_limit, thread_nums) = (self.verbose, self.time_limit, self.thread_nums);
+
         let mut model = self.into_inner();
         if verbose {
             model.set_option(&b"output_flag"[..], true);
             model.set_option(&b"log_to_console"[..], true);
             model.set_option(&b"log_dev_level"[..], 2);
         }
+        if let Some(time_limit) = time_limit {
+            model.set_option("time_limit", time_limit);
+        }
+        if let Some(thread_nums) = thread_nums {
+            if thread_nums > 1 {
+                model.set_option("parallel", "on");
+                model.set_option("threads", thread_nums);
+            }
+        }
+
         let solved = model.solve();
         match solved.status() {
             HighsModelStatus::NotSet => Err(ResolutionError::Other("NotSet")),
