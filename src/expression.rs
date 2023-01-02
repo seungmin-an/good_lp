@@ -54,6 +54,7 @@ impl FormatWithVars for LinearExpression {
         FUN: FnMut(&mut Formatter<'_>, Variable) -> std::fmt::Result,
     {
         let mut first = true;
+        write!(f, "(")?;
         for (&var, &coeff) in &self.coefficients {
             if coeff != 0f64 {
                 if first {
@@ -70,6 +71,7 @@ impl FormatWithVars for LinearExpression {
         if first {
             write!(f, "0")?;
         }
+        write!(f, ")")?;
         Ok(())
     }
 }

@@ -49,7 +49,9 @@ pub fn highs(to_solve: UnsolvedProblem) -> HighsProblem {
         columns,
         verbose: false,
         time_limit: None,
+        time_limit_as_error: false,
         thread_nums: None,
+        presolve: None,
     }
 }
 
@@ -61,7 +63,9 @@ pub struct HighsProblem {
     columns: Vec<highs::Col>,
     verbose: bool,
     time_limit: Option<f64>,
+    time_limit_as_error: bool,
     thread_nums: Option<i32>,
+    presolve: Option<&'static str>,
 }
 
 impl HighsProblem {
@@ -80,10 +84,21 @@ impl HighsProblem {
         self.time_limit = Some(time_limit);
     }
 
+    /// Consider time limit as an error
+    pub fn set_time_limit_as_error(&mut self, time_limit_as_error: bool) {
+        self.time_limit_as_error = time_limit_as_error;
+    }
+
     /// Sets the # of threads for solver
-    pub fn set_threads_nums(&mut self, thread_nums: i32) {
+    pub fn set_thread_nums(&mut self, thread_nums: i32) {
         assert!(thread_nums >= 1);
         self.thread_nums = Some(thread_nums);
+    }
+
+    /// Sets the presolve
+    pub fn set_presolve(&mut self, mode: &'static str) {
+        assert!(mode == "on" || mode == "off" || mode == "choose");
+        self.presolve = Some(mode);
     }
 }
 
@@ -92,7 +107,13 @@ impl SolverModel for HighsProblem {
     type Error = ResolutionError;
 
     fn solve(self) -> Result<Self::Solution, Self::Error> {
-        let (verbose, time_limit, thread_nums) = (self.verbose, self.time_limit, self.thread_nums);
+        let (verbose, time_limit, time_limit_as_error, thread_nums, presolve) = (
+            self.verbose,
+            self.time_limit,
+            self.time_limit_as_error,
+            self.thread_nums,
+            self.presolve,
+        );
 
         let mut model = self.into_inner();
         if verbose {
@@ -109,6 +130,9 @@ impl SolverModel for HighsProblem {
                 model.set_option("threads", thread_nums);
             }
         }
+        if let Some(presolve) = presolve {
+            model.set_option("presolve", presolve);
+        }
 
         let solved = model.solve();
         match solved.status() {
@@ -122,6 +146,13 @@ impl SolverModel for HighsProblem {
             HighsModelStatus::Infeasible => Err(ResolutionError::Infeasible),
             HighsModelStatus::Unbounded => Err(ResolutionError::Unbounded),
             HighsModelStatus::UnboundedOrInfeasible => Err(ResolutionError::Infeasible),
+            HighsModelStatus::ReachedTimeLimit if time_limit_as_error => {
+                Err(ResolutionError::Other("ReachedTimeLimit"))
+            }
+            HighsModelStatus::ReachedIterationLimit if time_limit_as_error => {
+                Err(ResolutionError::Other("ReachedIterationLimit"))
+            }
+            HighsModelStatus::Unknown => Err(ResolutionError::Other("Unknown")),
             _ok_status => Ok(HighsSolution {
                 solution: solved.get_solution(),
             }),
@@ -157,6 +188,10 @@ impl HighsSolution {
     /// Returns the highs solution object. You can use it to fetch dual values
     pub fn into_inner(self) -> highs::Solution {
         self.solution
+    }
+
+    pub fn objective(&self) -> f64 {
+        self.solution.objective()
     }
 }
 
